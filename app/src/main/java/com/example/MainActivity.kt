@@ -36,6 +36,10 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -109,6 +113,11 @@ fun MainScreen(onFinishActivity: () -> Unit) {
     var filePathCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     var currentPhotoUri by remember { mutableStateOf<Uri?>(null) }
 
+    var showAiChatDialog by remember { mutableStateOf(false) }
+    var aiPrompt by remember { mutableStateOf("") }
+    var aiResponse by remember { mutableStateOf("") }
+    var isAiLoading by remember { mutableStateOf(false) }
+
     val permissions = arrayOf(
         Manifest.permission.CAMERA,
         Manifest.permission.ACCESS_FINE_LOCATION,
@@ -181,22 +190,41 @@ fun MainScreen(onFinishActivity: () -> Unit) {
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
-            .imePadding()
-    ) { innerPadding ->
-        if (isOffline) {
-            OfflineScreen(
-                modifier = Modifier.padding(innerPadding),
-                onRetry = {
-                    isOffline = false
-                    webViewInstance?.reload()
+            .imePadding(),
+        floatingActionButton = {
+            if (!isOffline) {
+                androidx.compose.material3.FloatingActionButton(
+                    onClick = { showAiChatDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    androidx.compose.material3.Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Default.Star,
+                        contentDescription = "Tanya KOMBAT AI"
+                    )
                 }
-            )
-        } else {
-            AndroidView(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                factory = { ctx ->
+            }
+        }
+    ) { innerPadding ->
+        androidx.compose.animation.Crossfade(
+            targetState = isOffline,
+            label = "OfflineCrossfade"
+        ) { offline ->
+            if (offline) {
+                OfflineScreen(
+                    modifier = Modifier.padding(innerPadding),
+                    onRetry = {
+                        isOffline = false
+                        webViewInstance?.reload()
+                    }
+                )
+            } else {
+                AndroidView(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    factory = { ctx ->
                     WebView(ctx).apply {
                         webViewInstance = this
                         settings.apply {
@@ -300,6 +328,7 @@ fun MainScreen(onFinishActivity: () -> Unit) {
                     webViewInstance = it
                 }
             )
+            }
         }
     }
 
@@ -390,6 +419,74 @@ fun MainScreen(onFinishActivity: () -> Unit) {
             dismissButton = {
                 TextButton(onClick = { onFinishActivity() }, shape = buttonShape) {
                     Text("Keluar")
+                }
+            }
+        )
+    }
+
+    if (showAiChatDialog) {
+        val coroutineScope = rememberCoroutineScope()
+        AlertDialog(
+            onDismissRequest = { showAiChatDialog = false },
+            shape = dialogShape,
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { 
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.size(8.dp))
+                    Text("Asisten KOMBAT AI", fontWeight = FontWeight.Medium)
+                }
+            },
+            text = {
+                Column {
+                    if (aiResponse.isNotEmpty()) {
+                        androidx.compose.foundation.lazy.LazyColumn(
+                            modifier = Modifier.weight(1f, fill = false).padding(bottom = 16.dp)
+                        ) {
+                            item {
+                                Text(aiResponse, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
+                    androidx.compose.material3.OutlinedTextField(
+                        value = aiPrompt,
+                        onValueChange = { aiPrompt = it },
+                        label = { Text("Tanya seputar pertanian / absensi...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (aiPrompt.isNotBlank()) {
+                            isAiLoading = true
+                            aiResponse = "Menganalisis..."
+                            coroutineScope.launch {
+                                aiResponse = generateGeminiResponse(aiPrompt)
+                                isAiLoading = false
+                                aiPrompt = ""
+                            }
+                        }
+                    },
+                    enabled = !isAiLoading,
+                    shape = buttonShape
+                ) {
+                    if (isAiLoading) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Kirim")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAiChatDialog = false }, shape = buttonShape) {
+                    Text("Tutup")
                 }
             }
         )
