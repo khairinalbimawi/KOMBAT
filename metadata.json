@@ -1,0 +1,6 @@
+{
+  "name": "KOMBAT",
+  "description": "Sistem Jurnal dan Absensi Pegawai / Siswa",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
